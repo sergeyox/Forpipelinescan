@@ -171,4 +171,3 @@ jobs:
     steps:
       - name: Run OX Scan
         run: ox-block-mode
-    # continue-on-error: true
