@@ -1,0 +1,174 @@
+# .github/workflows/security_scan.yml
+name: Security Scan Pipeline
+
+# --- Trigger Conditions ---
+# Equivalent to GitLab's rules section
+on:
+  # Trigger on pushes to branches starting with 'pipeline_push/'
+  push:
+    branches:
+      - 'pipeline_push/**'  # Use glob pattern: ** matches multiple levels
+
+  # Trigger on pull requests where the SOURCE branch starts with 'pipeline_mr/'
+  # Note: 'branches' here refers to the TARGET branch of the PR by default.
+  # To filter by SOURCE branch like in GitLab, we check inside the job.
+  # A simpler approach (if acceptable) is to filter by TARGET branch:
+  # pull_request:
+  #   branches:
+  #     - main # Or other target branches
+  #     - develop
+  # OR Trigger on ANY pull request and filter in the job (more precise translation):
+  pull_request:
+    types: [opened, synchronize, reopened] # Events that trigger MR pipelines in GitLab
+
+jobs:
+  # --- Notify Job (Equivalent to notify_tests_started stage) ---
+  notify:
+    name: Notify Tests Started
+    runs-on: ubuntu-latest # Choose a runner OS
+    steps:
+      - name: Notify
+        run: echo "Automation tools system tests are running"
+
+  # --- Security Scan Jobs (Equivalent to test stage) ---
+  # NOTE: GitHub Actions runs jobs in parallel by default unless 'needs' is specified.
+  # All scan jobs will run concurrently after 'notify' completes.
+
+  ox_scan_dev:
+    name: OX Security Scan DEV
+    runs-on: ubuntu-latest
+    needs: notify # Ensures this runs after the notify job
+    # Condition to match the GitLab rule for pull requests (checking SOURCE branch)
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref_name, 'pipeline_push/')) ||
+      (github.event_name == 'pull_request' && startsWith(github.head_ref, 'pipeline_mr/'))
+    container: # Specify the Docker image to use
+      image: oxsecurity/ox-block-mode:latest
+    env: # Environment variables
+      OX_HOST_URL: https://dev-api.test-k8s.ox.security
+      # IMPORTANT: Configure OX_API_KEY_DEV as a secret in your GitHub repository settings
+      OX_API_KEY: ${{ secrets.OX_API_KEY_DEV }}
+    steps:
+      - name: Run OX Scan
+        run: ox-block-mode
+    # To allow failure (equivalent to allow_failure: true):
+    # continue-on-error: true
+
+  ox_scan_stg:
+    name: OX Security Scan STG
+    runs-on: ubuntu-latest
+    needs: notify
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref_name, 'pipeline_push/')) ||
+      (github.event_name == 'pull_request' && startsWith(github.head_ref, 'pipeline_mr/'))
+    container:
+      image: oxsecurity/ox-block-mode:latest
+    env:
+      OX_HOST_URL: https://stg-api.test-k8s.ox.security
+      OX_API_KEY: ${{ secrets.OX_API_KEY_STG }} # Configure as GitHub secret
+    steps:
+      - name: Run OX Scan
+        run: ox-block-mode
+    # continue-on-error: true
+
+  ox_scan_stg_sanity:
+    name: OX Security Scan STG Sanity
+    runs-on: ubuntu-latest
+    needs: notify
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref_name, 'pipeline_push/')) ||
+      (github.event_name == 'pull_request' && startsWith(github.head_ref, 'pipeline_mr/'))
+    container:
+      image: oxsecurity/ox-block-mode:latest
+    env:
+      OX_HOST_URL: https://stg-api.test-k8s.ox.security
+      OX_API_KEY: ${{ secrets.OX_API_KEY_STG_SANITY }} # Configure as GitHub secret
+    steps:
+      - name: Run OX Scan
+        run: ox-block-mode
+    # continue-on-error: true
+
+  ox_scan_prod:
+    name: OX Security Scan PROD
+    runs-on: ubuntu-latest
+    needs: notify
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref_name, 'pipeline_push/')) ||
+      (github.event_name == 'pull_request' && startsWith(github.head_ref, 'pipeline_mr/'))
+    container:
+      image: oxsecurity/ox-block-mode:latest
+    env:
+      # OX_HOST_URL: Add if needed
+      OX_API_KEY: ${{ secrets.OX_API_KEY_PROD }} # Configure as GitHub secret
+    steps:
+      - name: Run OX Scan
+        run: ox-block-mode
+    # continue-on-error: true
+
+  ox_scan_prod_sanity:
+    name: OX Security Scan PROD Sanity
+    runs-on: ubuntu-latest
+    needs: notify
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref_name, 'pipeline_push/')) ||
+      (github.event_name == 'pull_request' && startsWith(github.head_ref, 'pipeline_mr/'))
+    container:
+      image: oxsecurity/ox-block-mode:latest
+    env:
+      # OX_HOST_URL: Add if needed
+      OX_API_KEY: ${{ secrets.OX_API_KEY_PROD_SANITY }} # Configure as GitHub secret
+    steps:
+      - name: Run OX Scan
+        run: ox-block-mode
+    # continue-on-error: true
+
+  ox_scan_us:
+    name: OX Security Scan US
+    runs-on: ubuntu-latest
+    needs: notify
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref_name, 'pipeline_push/')) ||
+      (github.event_name == 'pull_request' && startsWith(github.head_ref, 'pipeline_mr/'))
+    container:
+      image: oxsecurity/ox-block-mode:latest
+    env:
+      OX_HOST_URL: https://app.us.ox.security
+      OX_API_KEY: ${{ secrets.OX_API_KEY_US }} # Configure as GitHub secret
+    steps:
+      - name: Run OX Scan
+        run: ox-block-mode
+    # continue-on-error: true
+
+  ox_scan_onprem1:
+    name: OX Security Scan ONPREM1
+    runs-on: ubuntu-latest
+    needs: notify
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref_name, 'pipeline_push/')) ||
+      (github.event_name == 'pull_request' && startsWith(github.head_ref, 'pipeline_mr/'))
+    container:
+      image: oxsecurity/ox-block-mode:latest
+    env:
+      OX_HOST_URL: https://app.onprem.dev.ox.security
+      OX_API_KEY: ${{ secrets.OX_API_KEY_ONPREM1 }} # Configure as GitHub secret
+    steps:
+      - name: Run OX Scan
+        run: ox-block-mode
+    # continue-on-error: true
+
+  ox_scan_onprem2:
+    name: OX Security Scan ONPREM2
+    runs-on: ubuntu-latest
+    needs: notify
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref_name, 'pipeline_push/')) ||
+      (github.event_name == 'pull_request' && startsWith(github.head_ref, 'pipeline_mr/'))
+    container:
+      image: oxsecurity/ox-block-mode:latest
+    env:
+      OX_HOST_URL: https://onprem2.test-k8s.ox.security
+      OX_API_KEY: ${{ secrets.OX_API_KEY_ONPREM2 }} # Configure as GitHub secret
+    steps:
+      - name: Run OX Scan
+        run: ox-block-mode
+    # continue-on-error: true
